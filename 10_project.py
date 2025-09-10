@@ -138,6 +138,89 @@ def spawn_objects(spawn_dist):
             spawned_types.append(obj_type)
 
 
+def update_game(dt):
+    global distance, fuel, game_over, speed, coins, high_score, next_spawn_distance, wheel_angle, road_offset
+    if paused or game_over:
+        return
+
+    distance += speed * dt
+    fuel -= fuel_decrease_rate * dt
+    if fuel <= 0:
+        fuel = 0
+        game_over = True
+
+    # Update wheel angle for rotation
+    wheel_angle += speed * dt * 2  # Adjust factor for rotation speed
+
+    # Update road offset for scrolling lines
+    road_offset = (road_offset + speed * dt) % 100
+
+    # Update active powerups
+    if 'doubler' in active_powerups:
+        active_powerups['doubler'] -= dt
+        if active_powerups['doubler'] <= 0:
+            del active_powerups['doubler']
+
+    if 'reducer' in active_powerups:
+        active_powerups['reducer'] -= dt
+        if active_powerups['reducer'] <= 0:
+            del active_powerups['reducer']
+        else:
+            speed = initial_speed * 0.5  # speed reduce korbe
+    else:
+        # compute normal speed from coins
+        speed = initial_speed + coins * speed_increment
+
+    if 'ghost' in active_powerups:
+        active_powerups['ghost'] -= speed * dt
+        if active_powerups['ghost'] <= 0:
+            del active_powerups['ghost']
+
+    # Move objects towards car
+    for obj in objects:
+        obj['y'] -= speed * dt
+
+    # Spawn new objects if needed (based on distance travelled)
+    while distance >= next_spawn_distance:
+        spawn_objects(next_spawn_distance)
+        next_spawn_distance += spawn_interval
+
+    # Remove off-screen objects
+    objects[:] = [obj for obj in objects if obj['y'] > -200]
+
+    # Check collisions
+    for obj in objects[:]:
+        if abs(obj['y']) < 50 and abs(obj['x'] - car_x) < 1.0: 
+            if obj['type'] == 'obstacle':
+                if 'ghost' not in active_powerups:
+                    game_over = True
+                objects.remove(obj)
+            elif obj['type'] == 'coin':
+                coin_value = 2 if 'doubler' in active_powerups else 1
+                coins += coin_value
+                objects.remove(obj)
+            elif obj['type'] == 'fuel':
+                # refill fuel, cap to max
+                fuel = min(fuel + 20, fuel_max)
+                objects.remove(obj)
+            elif obj['type'] == 'doubler':
+                active_powerups['doubler'] = powerup_duration
+                objects.remove(obj)
+            elif obj['type'] == 'reducer':
+                active_powerups['reducer'] = powerup_duration
+                objects.remove(obj)
+            elif obj['type'] == 'ghost':
+                active_powerups['ghost'] = ghost_distance
+                objects.remove(obj)
+
+    if game_over:
+        current_score = coins
+        high_score = max(high_score, current_score)
+        with open(high_score_file, "w") as f:
+            f.write(str(high_score))
+
+
+
 def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glColor3f(1,1,1)
     glMatrixMode(GL_PROJECTION)
@@ -303,6 +386,14 @@ def setupCamera():
               car_x, 100, 0,  # Look-at point (ahead of car)
               0, 0, 1)  # Up vector
 
+def idle():
+    global last_time
+    current_time = time.time()
+    dt = current_time - last_time
+    last_time = current_time
+    update_game(dt)
+    glutPostRedisplay()
+
 
 def showScreen():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -353,4 +444,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
