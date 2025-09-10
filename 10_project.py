@@ -80,6 +80,63 @@ def reset_game():
     next_powerup_spawn_distance = powerup_interval
 
 
+def spawn_objects(spawn_dist):
+    
+    global next_fuel_spawn_distance, next_powerup_spawn_distance
+    types = ['nothing', 'coin', 'obstacle']
+    powerups = ['doubler', 'reducer', 'ghost']
+    spawned_types = []
+
+    # small random offset jate objects same place e spawn na kore
+    y_offset = random.uniform(-50, 50)
+    spawn_y = visible_distance + y_offset
+
+    # Determine forced lanes for guaranteed spawns
+    fuel_lane = None
+    powerup_lane = None
+    forced_powerup_type = None
+
+    if spawn_dist >= next_fuel_spawn_distance:
+        fuel_lane = random.randrange(3)
+        # advance next guaranteed fuel spawn
+        next_fuel_spawn_distance += fuel_interval
+
+    if spawn_dist >= next_powerup_spawn_distance:
+        powerup_lane = random.randrange(3)
+        forced_powerup_type = random.choice(powerups)
+        
+        # if collides with fuel_lane -> put powerup in different lane
+        if fuel_lane is not None and powerup_lane == fuel_lane:
+            choices = [l for l in range(3) if l != fuel_lane]
+            powerup_lane = random.choice(choices)
+        next_powerup_spawn_distance += powerup_interval
+
+    # lanes
+    for lane in range(3):
+        if lane == fuel_lane:
+            obj_type = 'fuel'
+        elif lane == powerup_lane:
+            obj_type = forced_powerup_type
+        else:
+            # avoid too many obstacles in a row
+            if len(spawned_types) >= 2 and spawned_types[-1] == 'obstacle' and spawned_types[-2] == 'obstacle':
+                obj_type = random.choice(['nothing', 'coin'])
+            elif lane > 0 and 'obstacle' in spawned_types:
+                obj_type = random.choice(['nothing', 'coin'])
+            else:
+                r = random.random()
+                if r < 0.6:
+                    obj_type = 'coin'
+                elif r < 0.9:
+                    obj_type = 'obstacle'
+                else:
+                    obj_type = 'nothing'
+
+        if obj_type != 'nothing':
+            obj_x = lane_positions[lane]
+            objects.append({'type': obj_type, 'x': obj_x, 'y': spawn_y})
+            spawned_types.append(obj_type)
+
 
 def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glColor3f(1,1,1)
@@ -247,7 +304,37 @@ def setupCamera():
               0, 0, 1)  # Up vector
 
 
+def showScreen():
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    glViewport(0, 0, 1000, 800)
 
+    setupCamera()
+
+    draw_road()
+    draw_car()
+    for obj in objects:
+        draw_object(obj)
+
+    # HUD
+    scaled_distance = int(distance / 10)
+    draw_text(10, 750, f"Coins: {coins}")
+    draw_text(10, 730, f"Distance: {scaled_distance}")
+    draw_text(10, 710, f"Fuel: {int(fuel)}")
+    draw_text(10, 690, f"Speed: {int(speed)}")
+    
+    draw_text(450, 750, "PAGLA GARI", font=GLUT_BITMAP_HELVETICA_18)
+
+    if paused:
+        draw_text(400, 400, "Pause")
+
+    if game_over:
+        draw_text(450, 450, "Game Over")
+        draw_text(450, 420, f"Coins: {coins}")
+        draw_text(450, 390, f"Distance: {scaled_distance}")
+        draw_text(450, 360, f"High Score: {high_score}")
+
+    glutSwapBuffers()
 
 def main():
     global last_time
@@ -266,3 +353,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
