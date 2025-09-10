@@ -319,7 +319,7 @@ def draw_object(obj):
     elif obj['type'] == 'ghost':
         glColor3f(1, 1, 1)
         glRotatef(rotation, 0, 1, 0)
-        glutSolidSphere(20)
+        glutSolidSphere(25, 16, 16)
     glPopMatrix()
 
 def draw_road():
@@ -444,6 +444,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
